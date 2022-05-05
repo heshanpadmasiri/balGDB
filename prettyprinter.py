@@ -1,4 +1,11 @@
 import gdb.printing
+import gdb
+
+HEAP_ALIGNMENT = 8
+TAG_SHIFT = 56
+POINTER_MASK = (1 << TAG_SHIFT) - 1
+ALIGN_MASK = ~(HEAP_ALIGNMENT - 1)
+IMMEDIATE_FLAG = (0x20) << TAG_SHIFT
 
 class VarPrinter:
     def __init__(self, val):
@@ -12,14 +19,15 @@ class TaggedPrinter:
         self.val = val
 
     def to_string(self):
-        bits = self.__bits__()
-        if bits[63] == '1':
-            # immediate
-            bin_val = bits[8:]
-            return str(int(bin_val, 2))
-        return "pointer not implemented"
+        ptr_val = int(self.val)
+        ptr_body = ptr_val & POINTER_MASK
+        if ptr_val & IMMEDIATE_FLAG != 0:
+            return str(ptr_body)
+        new_ptr = (ptr_body & ALIGN_MASK)
+        new_val = gdb.Value(new_ptr).cast(self.val.type).dereference()
+        return str(int(new_val))
 
-    def __bits__(self):
+    def bits(self):
         return format(int(self.val), '064b');
 
 def build_pretty_printer():
