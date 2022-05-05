@@ -1,22 +1,34 @@
-import gdb
+import gdb.printing
+
 class VarPrinter:
     def __init__(self, val):
         self.val = val
 
     def to_string(self):
-        return str(self.val.type.name)
+        return str(int(self.val))
 
-    @staticmethod
-    def display_hint():
-        return "hint"
+class TaggedPrinter:
+    def __init__(self, val):
+        self.val = val
 
-def bal_printer(val):
-    valType = str(val.type.name)
-    print("called")
-    if valType == "var":
-        return VarPrinter(val)
-    elif valType == "TaggedPtr":
-        return VarPrinter(val)
+    def to_string(self):
+        bits = self.__bits__()
+        if bits[63] == '1':
+            # immediate
+            bin_val = bits[8:]
+            return str(int(bin_val, 2))
+        return "pointer not implemented"
 
+    def __bits__(self):
+        return format(int(self.val), '064b');
 
-gdb.pretty_printers.append(bal_printer)
+def build_pretty_printer():
+    pp = gdb.printing.RegexpCollectionPrettyPrinter(
+        "bal_pp")
+    pp.add_printer('TaggedPtr', '^TaggedPtr$', TaggedPrinter)
+    pp.add_printer('var', '^var$', VarPrinter)
+    return pp
+
+gdb.printing.register_pretty_printer(
+    gdb.current_objfile(),
+    build_pretty_printer())
